@@ -1,0 +1,77 @@
+include         /etc/ldap/schema/core.schema
+include         /etc/ldap/schema/cosine.schema
+include         /etc/ldap/schema/misc.schema
+include         /etc/ldap/schema/inetorgperson.schema
+include         /etc/ldap/schema/nis.schema
+
+
+loglevel        256
+
+sizelimit        -1
+
+pidfile         /var/lib/ldap/slapd.pid
+#argsfile       /var/run/openldap/slapd.args
+
+database config
+rootdn cn=admin,cn=config
+rootpw {{ .ldapEncryptedConfigAdminPassword}}
+access to dn.subtree="cn=config"
+         by * none
+
+moduleload syncprov
+moduleload unique
+moduleload back_mdb
+moduleload back_monitor
+
+overlay syncprov
+syncprov-sessionlog 100
+syncprov-checkpoint 100 10
+
+#Monitor database.
+database monitor
+rootdn          "cn=admin,{{ .ldapRoot}}"
+access to dn.subtree="cn=monitor"
+        by dn.exact="uid=admin,dc=blockchain" read
+        by dn.exact="uid=micro,dc=blockchain" read
+        by * none
+
+
+database        mdb
+suffix          "{{ .ldapRoot}}"
+rootdn          "cn=admin,{{ .ldapRoot}}"
+rootpw {{ .ldapEncryptedConfigAdminPassword}}
+directory       /var/lib/ldap/0
+
+# monitor
+monitoring on
+
+# index
+index default eq
+index objectClass,uid,o eq
+index name,cn,sn,givenName eq,sub
+index uidNumber,gidNumber,entryUUID,entryCSN eq
+index member,owner,seeAlso eq
+index mail eq
+
+# ACL
+access to dn="{{ .ldapRoot}}"
+        by users read
+        by anonymous auth
+        by * none
+
+access to *
+        by self write
+        by dn.exact="uid=micro,{{ .ldapRoot}}" write
+        by users read
+        by anonymous auth
+        by * none
+
+### layers
+overlay syncprov
+syncprov-sessionlog 100
+syncprov-checkpoint 100 10
+
+# uniqueness
+overlay unique
+unique_base "{{ .ldapRoot}}"
+unique_attributes uid
