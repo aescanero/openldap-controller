@@ -12,37 +12,22 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.*/
 
-package cmd
+package docker
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/aescanero/openldap-node/cmd/docker"
+	"github.com/aescanero/openldap-node/service"
 	"github.com/spf13/cobra"
 )
 
-var (
-	RootCmd = &cobra.Command{
-		Use:   "controller",
-		Short: "Openldap-controller is a layer to manage Openldap nodes",
-		Long: `"Openldap-controller is part of the Disasterproject's Openldap Operator
-		Author:  Alejandro Escanero Blanco <aescanero@disasterproject.com>
-		license: Apache 2.0`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// Do Stuff Here
-		},
-	}
-)
-
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+func init() {
+	DockerCmd.AddCommand(stopCmd)
 }
 
-func init() {
-	RootCmd.AddCommand(versionCmd)
-	RootCmd.AddCommand(docker.DockerCmd)
+var stopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop Openldap Node",
+	Long:  `Stop Openldap Node`,
+	Run: func(cmd *cobra.Command, args []string) {
+		service.Stop()
+	},
 }

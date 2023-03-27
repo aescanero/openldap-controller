@@ -12,13 +12,13 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.*/
 
-package cmd
+package docker
 
 import (
 	"fmt"
 
-	"github.com/aescanero/openldap-controller/service"
-	"github.com/aescanero/openldap-controller/utils"
+	"github.com/aescanero/openldap-node/service"
+	"github.com/aescanero/openldap-node/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +34,7 @@ var (
 )
 
 func init() {
-	fmt.Println("Port1: " + port)
+	DockerCmd.AddCommand(startCmd)
 	startCmd.Flags().StringVarP(&base, "base", "b", "", "LDAP base RDN")
 	startCmd.Flags().StringVarP(&adminPassword, "adminpassword", "a", "", "LDAP admin Password (for cn=admin, base DN)")
 	startCmd.Flags().StringVarP(&port, "port", "p", "", "LDAP port")

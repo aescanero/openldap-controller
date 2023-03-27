@@ -12,21 +12,24 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.*/
 
-package cmd
+package kubernetes
 
 import (
-	"github.com/aescanero/openldap-controller/service"
+	"github.com/aescanero/openldap-node/service"
+	"github.com/aescanero/openldap-node/utils"
 	"github.com/spf13/cobra"
 )
 
 func init() {
+	kubernetesCmd.AddCommand(startCmd)
+	statusCmd.Flags().StringVarP(&port, "port", "p", utils.GetEnv("LDAP_PORT", "1389"), "LDAP port (default 1389)")
 }
 
-var stopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stop Openldap Node",
-	Long:  `Stop Openldap Node`,
+var statusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Openldap Node Status",
+	Long:  `Openldap Node Status`,
 	Run: func(cmd *cobra.Command, args []string) {
-		service.Stop()
+		service.OpenldapStatus(port)
 	},
 }

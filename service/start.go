@@ -18,7 +18,6 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"html/template"
 	"io"
 	"log"
@@ -27,7 +26,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aescanero/openldap-controller/utils"
+	"github.com/aescanero/openldap-node/utils"
 	"github.com/go-ldap/ldap"
 )
 
@@ -50,7 +49,7 @@ func Start(base, adminPassword, port, debug string) {
 
 	go func() {
 		out, _ := exec.Command("/usr/sbin/slapd", "-d", "256", "-F", "/etc/ldap/slapd.d", "-h", "ldap://0.0.0.0:1389").Output()
-		fmt.Printf("RES: %s\n", out)
+		log.Printf("RES: %s\n", out)
 		stateError <- errors.New("Openldap Ended")
 	}()
 
@@ -97,8 +96,6 @@ func createConfiguration(base, adminPassword, port, debug string) {
 		"ldapRoot":                         base,
 		"ldapEncryptedConfigAdminPassword": "{SSHA}" + base64.StdEncoding.EncodeToString(adminPasswordSHA),
 	}
-	fmt.Println("base64 password")
-	fmt.Println(base64.StdEncoding.EncodeToString(adminPasswordSHA))
 
 	slapdConf, err := template.New("slapdConf").Parse(slapdConfTemplate) //template.ParseFS(conf, "templates/slapd.conf.tmpl")
 	if err != nil {
@@ -133,13 +130,7 @@ func createConfiguration(base, adminPassword, port, debug string) {
 	}
 
 	out, _ := exec.Command("/usr/sbin/slaptest", "-f", "/tmp/slapd.conf", "-F", "/etc/ldap/slapd.d").Output()
-	fmt.Printf("RES %s\n", out)
-
-	out, err = exec.Command("ls", "-l", "/etc/ldap").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Directory %s\n", out)
+	log.Printf("RES %s\n", out)
 
 	f, err = os.Create("/tmp/base.ldif")
 	if err != nil {
@@ -148,7 +139,7 @@ func createConfiguration(base, adminPassword, port, debug string) {
 
 	parsedDN, err := ldap.ParseDN(base)
 	if err != nil || len(parsedDN.RDNs) == 0 {
-		fmt.Println(err)
+		log.Println(err)
 	}
 	switch parsedDN.RDNs[0].Attributes[0].Type {
 	case "o":
@@ -162,7 +153,6 @@ objectClass: dcObject
 dc: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 
 	}
-	fmt.Println("Ldif: " + baseLdifTemplate)
 
 	baseLdap, err := template.New("baseLdap").Parse(baseLdifTemplate) //template.ParseFS(conf, "templates/base.ldif.tmpl")
 	if err != nil {
@@ -179,7 +169,7 @@ dc: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 	}
 
 	out, _ = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
-	fmt.Printf("RES: %s\n", out)
+	log.Printf("RES: %s\n", out)
 
 	log.Print("Configuring Openldap")
 }
