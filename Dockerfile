@@ -40,4 +40,4 @@ WORKDIR /
 EXPOSE 1389 1636
 
 ENTRYPOINT ["/controller"]
-CMD ["docker", "start"]
+CMD ["start"]

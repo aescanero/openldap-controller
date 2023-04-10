@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aescanero/openldap-node/cmd/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -44,5 +43,7 @@ func Execute() {
 
 func init() {
 	RootCmd.AddCommand(versionCmd)
-	RootCmd.AddCommand(docker.DockerCmd)
+	RootCmd.AddCommand(startCmd)
+	RootCmd.AddCommand(statusCmd)
+	RootCmd.AddCommand(stopCmd)
 }
