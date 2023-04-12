@@ -16,71 +16,54 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/aescanero/openldap-node/service"
 	"github.com/aescanero/openldap-node/utils"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 var (
-	baseEnv             string = utils.GetEnv("LDAP_BASE", "dc=example")
-	adminPasswordEnv    string = utils.GetEnv("LDAP_ADMIN_PASSWORD", utils.Random(10))
-	replicaPasswordEnv  string = utils.GetEnv("LDAP_REPLICA_PASSWORD", utils.Random(10))
-	portEnv             string = utils.GetEnv("LDAP_PORT", "1389")
-	debugEnv            string = utils.GetEnv("LDAP_DEBUG", "256")
-	base                string
-	adminPassword       string
-	port                string
-	debug               string
-	config              string
-	configFile          string
-	replicaPassword     string
-	adminPasswordFile   string
-	replicaPasswordFile string
-	ldapPort            string
-	ldapsPort           string
-	ca                  string
-	crt                 string
-	crtKey              string
-	caFile              string
-	crtFile             string
-	crtKeyFile          string
-	replicaUrl          string
-	replicaCa           string
-	replicaCrt          string
-	replicaCrtKey       string
-	replicaCaFile       string
-	replicaCrtFile      string
-	replicaCrtKeyFile   string
+	database  service.DatabaseConfig
+	srvConfig service.ServerConfig
+
+	baseEnv            string = utils.GetEnv("LDAP_BASE", "dc=example")
+	adminPasswordEnv   string = utils.GetEnv("LDAP_ADMIN_PASSWORD", utils.Random(10))
+	replicaPasswordEnv string = utils.GetEnv("LDAP_REPLICA_PASSWORD", utils.Random(10))
+	portEnv            string = utils.GetEnv("LDAP_PORT", "1389")
+	debugEnv           string = utils.GetEnv("LDAP_DEBUG", "256")
+	config             string
+	configFile         string
 )
 
 func init() {
-	startCmd.Flags().StringVarP(&base, "base", "", "dc=example", "LDAP base RDN")
+	startCmd.Flags().StringVarP(&database.Base, "base", "", "dc=example", "LDAP base RDN")
 	startCmd.Flags().StringVarP(&config, "config", "", "", "Yaml config")
 	startCmd.Flags().StringVarP(&configFile, "config_file", "", "", "Yaml config file")
-	startCmd.Flags().StringVarP(&adminPassword, "adminpassword", "", "", "LDAP admin Password (for cn=admin, base DN)")
-	startCmd.Flags().StringVarP(&replicaPassword, "replicapassword", "", "", "LDAP replica Password (for cn=replica, base DN)")
-	startCmd.Flags().StringVarP(&adminPasswordFile, "adminpassword_file", "", "", "File with LDAP admin Password (for cn=admin, base DN)")
-	startCmd.Flags().StringVarP(&replicaPasswordFile, "replicapassword_file", "", "", "File with LDAP replica Password (for cn=replica, base DN)")
-	startCmd.Flags().StringVarP(&debug, "debug", "d", "", "Openldap debug (default 256 = Show all queries)")
+	startCmd.Flags().StringVarP(&srvConfig.AdminPassword, "admin_password", "", "", "LDAP admin Password (for cn=admin, base DN) Has priority over file")
+	startCmd.Flags().StringVarP(&srvConfig.ReplicaPassword, "replica_password", "", "", "LDAP replica Password (for cn=replica, base DN) Has priority over file")
+	startCmd.Flags().StringVarP(&srvConfig.AdminPasswordFile, "admin_password_file", "", "", "File with LDAP admin Password (for cn=admin, base DN)")
+	startCmd.Flags().StringVarP(&srvConfig.ReplicaPasswordFile, "replica_password_file", "", "", "File with LDAP replica Password (for cn=replica, base DN)")
+	startCmd.Flags().StringVarP(&srvConfig.Debug, "debug", "d", "", "Openldap debug (default 256 = Show all queries)")
 
-	startCmd.Flags().StringVarP(&ldapPort, "ldap_port", "", "", "LDAP port")
-	startCmd.Flags().StringVarP(&ldapsPort, "ldaps_port", "", "", "LDAPS port")
-	startCmd.Flags().StringVarP(&ca, "ca", "", "", "CA certificate")
-	startCmd.Flags().StringVarP(&crt, "crt", "", "", "CERT certificate")
-	startCmd.Flags().StringVarP(&crtKey, "crt_key", "", "", "CERT Private Key")
-	startCmd.Flags().StringVarP(&caFile, "ca_file", "", "", "File with CA certificate")
-	startCmd.Flags().StringVarP(&crtFile, "crt_file", "", "", "File with CERT certificate")
-	startCmd.Flags().StringVarP(&crtKeyFile, "crt_key_file", "", "", "File with CERT Private Key")
+	startCmd.Flags().StringVarP(&srvConfig.LdapPort, "ldap_port", "", "", "LDAP port")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsPort, "ldaps_port", "", "", "LDAPS port")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.Ca, "ca", "", "", "CA certificate. Has priority over file")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.Crt, "crt", "", "", "CERT certificate. Has priority over file")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtKey, "crt_key", "", "", "CERT Private Key. Has priority over file")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CaFile, "ca_file", "", "", "File with CA certificate")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtFile, "crt_file", "", "", "File with CERT certificate")
+	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtKeyFile, "crt_key_file", "", "", "File with CERT Private Key")
 
-	startCmd.Flags().StringVarP(&base, "base", "", "dc=example", "LDAP base RDN")
-	startCmd.Flags().StringVarP(&replicaUrl, "replica_url", "", "ldaps://ldap.example.com", "LDAP base RDN")
-	startCmd.Flags().StringVarP(&replicaCa, "replica_ca", "", "", "CA certificate for Replica")
-	startCmd.Flags().StringVarP(&replicaCrt, "replica_crt", "", "", "CERT certificate for Replica")
-	startCmd.Flags().StringVarP(&replicaCrtKey, "replica_crt_key", "", "", "CERT Private Key for Replica")
-	startCmd.Flags().StringVarP(&replicaCaFile, "replica_ca_file", "", "", "File with CA certificate for Replica")
-	startCmd.Flags().StringVarP(&replicaCrtFile, "replica_crt_file", "", "", "File with CERT certificate for Replica")
-	startCmd.Flags().StringVarP(&replicaCrtKeyFile, "replica_crt_key_file", "", "", "File with CERT Private Key for Replica")
+	startCmd.Flags().StringVarP(&database.Replicatls.ReplicaUrl, "replica_url", "", "ldaps://ldap.example.com", "LDAP base RDN")
+	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.Ca, "replica_ca", "", "", "CA certificate for Replica. Has priority over file")
+	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.Crt, "replica_crt", "", "", "CERT certificate for Replica. Has priority over file")
+	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CrtKey, "replica_crt_key", "", "", "CERT Private Key for Replica. Has priority over file")
+	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CaFile, "replica_ca_file", "", "", "File with CA certificate for Replica")
+	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CrtFile, "replica_crt_file", "", "", "File with CERT certificate for Replica")
+	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CrtKeyFile, "replica_crt_key_file", "", "", "File with CERT Private Key for Replica")
 
 	/*   databases:
 	  - base: ...
@@ -101,20 +84,32 @@ var startCmd = &cobra.Command{
 	Short: "Start Openldap Node",
 	Long:  `Start Openldap Node`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if adminPassword == "" {
-			adminPassword = adminPasswordEnv
+
+		myConfig := service.Config{}
+		if configFile != "" {
+			data, err := os.ReadFile(configFile)
+			if err != nil {
+				log.Fatalf("error: %v", err)
+				panic(err.Error())
+			}
+			err = yaml.Unmarshal(data, myConfig)
+			if err != nil {
+				log.Fatalf("error: %v", err)
+				panic(err.Error())
+			}
+		} else {
+			err := yaml.Unmarshal([]byte(config), myConfig)
+			if err != nil {
+				log.Fatalf("error: %v", err)
+				panic(err.Error())
+			}
 		}
-		if base == "" {
-			base = baseEnv
-		}
-		if port == "" {
-			port = portEnv
-		}
-		if debug == "" {
-			debug = debugEnv
-		}
-		fmt.Println("Base: " + base)
-		fmt.Println("Port2: " + port)
-		service.Start(base, adminPassword, port, debug)
+
+		myConfig.SrvConfig.ImportNotNull(&srvConfig)
+		myConfig.Database[0].ImportNotNull(&database)
+
+		fmt.Println("Base: " + myConfig.Database[0].Base)
+		fmt.Println("Port: " + myConfig.SrvConfig.LdapPort)
+		service.Start(myConfig)
 	},
 }

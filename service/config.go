@@ -59,35 +59,139 @@ syncrepl
 */
 package service
 
+import (
+	"errors"
+	"os"
+)
+
 type tls struct {
-	ca     string
-	crt    string
-	crtKey string
+	Ca         string
+	Crt        string
+	CrtKey     string
+	CaFile     string
+	CrtFile    string
+	CrtKeyFile string
 }
 
 type serverTls struct {
-	ldapsPort string
-	ldapsTls  tls
+	LdapsPort string
+	LdapsTls  tls
 }
 
 type replicaTls struct {
-	replicaPasswordFile string
-	ldapsTls            tls
-	replicaUrl          string
+	ReplicaPasswordFile string
+	LdapsTls            tls
+	ReplicaUrl          string
 }
 
-type serverConfig struct {
-	adminPasswordFile string
-	ldapPort          string
-	srvtls            serverTls
+type ServerConfig struct {
+	AdminPassword       string
+	AdminPasswordFile   string
+	ReplicaPassword     string
+	ReplicaPasswordFile string
+	LdapPort            string
+	Srvtls              serverTls
+	Debug               string
 }
 
-type databaseConfig struct {
-	base       string
-	replicatls replicaTls
+type DatabaseConfig struct {
+	Base       string
+	Replicatls replicaTls
 }
 
-type config struct {
-	srvConfig serverConfig
-	database  []databaseConfig
+type Config struct {
+	SrvConfig ServerConfig
+	Database  []DatabaseConfig
+}
+
+func (scIn *ServerConfig) ImportNotNull(sc *ServerConfig) {
+	if sc.AdminPassword != "" {
+		scIn.AdminPassword = sc.AdminPassword
+	}
+	if sc.AdminPasswordFile != "" {
+		scIn.AdminPasswordFile = sc.AdminPasswordFile
+	}
+	if sc.Debug != "" {
+		scIn.Debug = sc.Debug
+	}
+	if sc.LdapPort != "" {
+		scIn.LdapPort = sc.LdapPort
+	}
+	if sc.ReplicaPassword != "" {
+		scIn.ReplicaPassword = sc.ReplicaPassword
+	}
+	if sc.ReplicaPasswordFile != "" {
+		scIn.ReplicaPasswordFile = sc.ReplicaPasswordFile
+	}
+	scIn.Srvtls.ImportNotNull(&sc.Srvtls)
+}
+
+func (stIn *serverTls) ImportNotNull(st *serverTls) {
+	if st.LdapsPort != "" {
+		stIn.LdapsPort = st.LdapsPort
+	}
+	stIn.LdapsTls.ImportNotNull(&st.LdapsTls)
+}
+
+func (tIn *tls) ImportNotNull(t *tls) {
+	if t.Ca != "" {
+		tIn.Ca = t.Ca
+	}
+	if t.CaFile != "" {
+		tIn.CaFile = t.CaFile
+	}
+	if t.Crt != "" {
+		tIn.Crt = t.Crt
+	}
+	if t.CrtFile != "" {
+		tIn.CrtFile = t.CrtFile
+	}
+	if t.CrtKey != "" {
+		tIn.CrtKey = t.CrtKey
+	}
+	if t.CrtKeyFile != "" {
+		tIn.CrtKeyFile = t.CrtKeyFile
+	}
+}
+
+func (dbIn *DatabaseConfig) ImportNotNull(db *DatabaseConfig) {
+	if db.Base != "" {
+		dbIn.Base = db.Base
+	}
+	dbIn.Replicatls.ImportNotNull(&db.Replicatls)
+}
+
+func (rtIn *replicaTls) ImportNotNull(rt *replicaTls) {
+	if rt.ReplicaPasswordFile != "" {
+		rtIn.ReplicaPasswordFile = rt.ReplicaPasswordFile
+	}
+	rtIn.LdapsTls.ImportNotNull(&rt.LdapsTls)
+}
+
+func (scIn *ServerConfig) GetAdminPassword() (string, error) {
+	if scIn.AdminPassword != "" {
+		return scIn.AdminPassword, nil
+	}
+	if scIn.AdminPasswordFile != "" {
+		adminPass, err := os.ReadFile(scIn.AdminPasswordFile)
+		if err != nil {
+			return "", err
+		}
+		return string(adminPass), nil
+	}
+	return "", errors.New("admin password is required")
+}
+
+func (scIn *ServerConfig) GetReplicaPassword() (string, error) {
+	if scIn.ReplicaPassword != "" {
+		return scIn.ReplicaPassword, nil
+	}
+	if scIn.ReplicaPasswordFile != "" {
+		ReplicaPass, err := os.ReadFile(scIn.ReplicaPasswordFile)
+		if err != nil {
+			return "", err
+		}
+		return string(ReplicaPass), nil
+	}
+	return "", errors.New("replica password is required")
 }

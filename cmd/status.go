@@ -20,6 +20,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	port string
+)
+
 func init() {
 	statusCmd.Flags().StringVarP(&port, "port", "p", utils.GetEnv("LDAP_PORT", "1389"), "LDAP port (default 1389)")
 }
