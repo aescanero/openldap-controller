@@ -1,0 +1,21 @@
+srvconfig:
+    adminpasswordfile: /tmp/passfile
+    ldapport: "1389"
+    srvtls:
+        ldapsport: "1686"
+        ldapstls:
+            cafile: "/tmp/ca.crt"
+            crtfile: "/tmp/cert.crt"
+            crtkeyfile: "/tmp/cert.key"
+database:
+    - base: ""
+      replicatls:
+        replicapasswordfile: ""
+        ldapstls:
+            ca: ""
+            crt: ""
+            crtkey: ""
+            cafile: ""
+            crtfile: ""
+            crtkeyfile: ""
+        replicaurl: ""

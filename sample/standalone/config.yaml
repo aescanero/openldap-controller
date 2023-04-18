@@ -1,0 +1,12 @@
+srvconfig:
+    adminpasswordfile: /config/passfile
+    ldapport: "1389"
+    srvtls:
+        ldapsport: "1686"
+        ldapstls:
+            cafile: "/config/ca.crt"
+            crtfile: "/config/cert.crt"
+            crtkeyfile: "/config/cert.key"
+database:
+    - base: "dc=example,dc=org"
+
