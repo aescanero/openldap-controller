@@ -13,7 +13,7 @@ pidfile         /var/lib/ldap/slapd.pid
 
 database config
 rootdn cn=admin,cn=config
-rootpw {{ .ldapEncryptedConfigAdminPassword}}
+rootpw {{ $.SrvConfig.AdminPasswordSHA }}
 access to dn.subtree="cn=config"
          by * none
 
@@ -28,18 +28,17 @@ syncprov-checkpoint 100 10
 
 #Monitor database.
 database monitor
-rootdn          "cn=admin,{{ .ldapRoot}}"
+rootdn "cn=admin,cn=config"
 access to dn.subtree="cn=monitor"
-        by dn.exact="uid=admin,dc=blockchain" read
-        by dn.exact="uid=micro,dc=blockchain" read
         by * none
 
-
+{{range $i, $d := .Database}}
+{{ $base := .Base }}
 database        mdb
-suffix          "{{ .ldapRoot}}"
-rootdn          "cn=admin,{{ .ldapRoot}}"
-rootpw {{ .ldapEncryptedConfigAdminPassword}}
-directory       /var/lib/ldap/0
+suffix          "{{ $base}}"
+rootdn          "cn=admin,{{ $base}}"
+rootpw {{ $.SrvConfig.AdminPasswordSHA }}
+directory       /var/lib/ldap/{{ $i }}
 
 # monitor
 monitoring on
@@ -53,24 +52,38 @@ index member,owner,seeAlso eq
 index mail eq
 
 # ACL
-access to dn="{{ .ldapRoot}}"
+access to dn="{{ $base}}"
         by users read
         by anonymous auth
         by * none
 
 access to *
         by self write
-        by dn.exact="cn=replica,{{ .ldapRoot}}" write
+        by dn.exact="cn=replica,{{ $base}}" write
         by users read
         by anonymous auth
         by * none
+
+{{range .Replicatls}} 
+syncrepl
+        provider={{.ReplicaUrl}}
+        bindmethod=simple
+        binddn="cn=replica.{{ $base}}"
+        credentials={{ $.SrvConfig.ReplicaPasswordSHA }}
+        starttls=critical
+        schemachecking=on
+        scope=sub
+        searchbase="{{ $base}}"
+        tls_cacert="{{ .LdapsTls.CaFile}}"
+        tls_cert="{{ .LdapsTls.CrtFile}}"
+        tls_key="{{ .LdapsTls.CrtKeyFile}}"
+        tls_protocol_min=1.2
+        tls_reqcert=demand
+        type=refreshAndPersist
+{{end}}
+{{end}}
 
 ### layers
 overlay syncprov
 syncprov-sessionlog 100
 syncprov-checkpoint 100 10
-
-# uniqueness
-overlay unique
-unique_base "{{ .ldapRoot}}"
-unique_attributes uid
