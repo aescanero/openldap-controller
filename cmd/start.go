@@ -29,17 +29,14 @@ var (
 	database  service.DatabaseConfig
 	srvConfig service.ServerConfig
 
-	baseEnv            string = utils.GetEnv("LDAP_BASE", "dc=example")
-	adminPasswordEnv   string = utils.GetEnv("LDAP_ADMIN_PASSWORD", utils.Random(10))
-	replicaPasswordEnv string = utils.GetEnv("LDAP_REPLICA_PASSWORD", utils.Random(10))
-	portEnv            string = utils.GetEnv("LDAP_PORT", "1389")
-	debugEnv           string = utils.GetEnv("LDAP_DEBUG", "256")
-	config             string
-	configFile         string
+	portEnv    string = utils.GetEnv("LDAP_PORT", "1389")
+	debugEnv   string = utils.GetEnv("LDAP_DEBUG", "256")
+	config     string
+	configFile string
 )
 
 func init() {
-	startCmd.Flags().StringVarP(&database.Base, "base", "", "dc=example", "LDAP base RDN")
+	startCmd.Flags().StringVarP(&database.Base, "base", "", "", "LDAP base RDN")
 	startCmd.Flags().StringVarP(&config, "config", "", "", "Yaml config")
 	startCmd.Flags().StringVarP(&configFile, "config_file", "", "", "Yaml config file")
 	startCmd.Flags().StringVarP(&srvConfig.AdminPassword, "admin_password", "", "", "LDAP admin Password (for cn=admin, base DN) Has priority over file")
@@ -57,13 +54,16 @@ func init() {
 	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtFile, "crt_file", "", "", "File with CERT certificate")
 	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtKeyFile, "crt_key_file", "", "", "File with CERT Private Key")
 
-	startCmd.Flags().StringVarP(&database.Replicatls.ReplicaUrl, "replica_url", "", "ldaps://ldap.example.com", "LDAP base RDN")
-	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.Ca, "replica_ca", "", "", "CA certificate for Replica. Has priority over file")
-	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.Crt, "replica_crt", "", "", "CERT certificate for Replica. Has priority over file")
-	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CrtKey, "replica_crt_key", "", "", "CERT Private Key for Replica. Has priority over file")
-	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CaFile, "replica_ca_file", "", "", "File with CA certificate for Replica")
-	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CrtFile, "replica_crt_file", "", "", "File with CERT certificate for Replica")
-	startCmd.Flags().StringVarP(&database.Replicatls.LdapsTls.CrtKeyFile, "replica_crt_key_file", "", "", "File with CERT Private Key for Replica")
+	repl := new(service.ReplicaTls)
+	database.Replicatls = append(database.Replicatls, *repl)
+
+	startCmd.Flags().StringVarP(&database.Replicatls[0].ReplicaUrl, "replica_url", "", "", "LDAP base RDN")
+	startCmd.Flags().StringVarP(&database.Replicatls[0].LdapsTls.Ca, "replica_ca", "", "", "CA certificate for Replica. Has priority over file")
+	startCmd.Flags().StringVarP(&database.Replicatls[0].LdapsTls.Crt, "replica_crt", "", "", "CERT certificate for Replica. Has priority over file")
+	startCmd.Flags().StringVarP(&database.Replicatls[0].LdapsTls.CrtKey, "replica_crt_key", "", "", "CERT Private Key for Replica. Has priority over file")
+	startCmd.Flags().StringVarP(&database.Replicatls[0].LdapsTls.CaFile, "replica_ca_file", "", "", "File with CA certificate for Replica")
+	startCmd.Flags().StringVarP(&database.Replicatls[0].LdapsTls.CrtFile, "replica_crt_file", "", "", "File with CERT certificate for Replica")
+	startCmd.Flags().StringVarP(&database.Replicatls[0].LdapsTls.CrtKeyFile, "replica_crt_key_file", "", "", "File with CERT Private Key for Replica")
 
 	/*   databases:
 	  - base: ...
@@ -92,13 +92,13 @@ var startCmd = &cobra.Command{
 				log.Fatalf("error: %v", err)
 				panic(err.Error())
 			}
-			err = yaml.Unmarshal(data, myConfig)
+			err = yaml.Unmarshal(data, &myConfig)
 			if err != nil {
 				log.Fatalf("error: %v", err)
 				panic(err.Error())
 			}
 		} else {
-			err := yaml.Unmarshal([]byte(config), myConfig)
+			err := yaml.Unmarshal([]byte(config), &myConfig)
 			if err != nil {
 				log.Fatalf("error: %v", err)
 				panic(err.Error())
