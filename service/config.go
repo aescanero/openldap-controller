@@ -61,6 +61,7 @@ package service
 
 import (
 	"errors"
+	"log"
 	"os"
 )
 
@@ -78,7 +79,7 @@ type serverTls struct {
 	LdapsTls  tls
 }
 
-type replicaTls struct {
+type ReplicaTls struct {
 	ReplicaPasswordFile string
 	LdapsTls            tls
 	ReplicaUrl          string
@@ -86,8 +87,10 @@ type replicaTls struct {
 
 type ServerConfig struct {
 	AdminPassword       string
+	AdminPasswordSHA    string
 	AdminPasswordFile   string
 	ReplicaPassword     string
+	ReplicaPasswordSHA  string
 	ReplicaPasswordFile string
 	LdapPort            string
 	Srvtls              serverTls
@@ -96,7 +99,7 @@ type ServerConfig struct {
 
 type DatabaseConfig struct {
 	Base       string
-	Replicatls replicaTls
+	Replicatls []ReplicaTls
 }
 
 type Config struct {
@@ -158,10 +161,20 @@ func (dbIn *DatabaseConfig) ImportNotNull(db *DatabaseConfig) {
 	if db.Base != "" {
 		dbIn.Base = db.Base
 	}
-	dbIn.Replicatls.ImportNotNull(&db.Replicatls)
+	ix := 0
+	for _, rep := range db.Replicatls {
+		log.Printf("ix: %d len:%d", ix, len(dbIn.Replicatls))
+		if len(dbIn.Replicatls) <= ix {
+			dbIn.Replicatls = append(dbIn.Replicatls, rep)
+		} else {
+			dbIn.Replicatls[ix].ImportNotNull(&rep)
+		}
+
+		ix = ix + 1
+	}
 }
 
-func (rtIn *replicaTls) ImportNotNull(rt *replicaTls) {
+func (rtIn *ReplicaTls) ImportNotNull(rt *ReplicaTls) {
 	if rt.ReplicaPasswordFile != "" {
 		rtIn.ReplicaPasswordFile = rt.ReplicaPasswordFile
 	}
