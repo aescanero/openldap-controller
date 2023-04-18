@@ -96,16 +96,16 @@ func createConfiguration(myConfig Config) error {
 	base := myConfig.Database[0].Base
 	adminPassword, err := myConfig.SrvConfig.GetAdminPassword()
 	if err != nil {
-		log.Fatal("Error loading templates:" + err.Error())
+		log.Fatal("Error loading config:" + err.Error())
 		panic(err)
 	}
 
 	encode := utils.Encode{}
 	adminPasswordSHA := encode.MakeSSHAEncode([]byte(adminPassword))
+	myConfig.SrvConfig.AdminPasswordSHA = "{SSHA}" + base64.StdEncoding.EncodeToString(adminPasswordSHA)
 
-	config := map[string]string{
-		"ldapRoot":                         base,
-		"ldapEncryptedConfigAdminPassword": "{SSHA}" + base64.StdEncoding.EncodeToString(adminPasswordSHA),
+	if myConfig.Database[0].Replicatls[0].ReplicaUrl == "" {
+		myConfig.Database[0].Replicatls = nil
 	}
 
 	slapdConf, err := template.New("slapdConf").Parse(slapdConfTemplate) //template.ParseFS(conf, "templates/slapd.conf.tmpl")
@@ -120,7 +120,7 @@ func createConfiguration(myConfig Config) error {
 		panic(err)
 	}
 
-	err = slapdConf.Execute(io.Writer(f), config)
+	err = slapdConf.Execute(io.Writer(f), myConfig)
 	if err != nil {
 		log.Print("Can't execute ", "templates/slapd.conf.tmpl")
 		panic(err)
@@ -145,6 +145,7 @@ func createConfiguration(myConfig Config) error {
 		panic(err)
 	}
 
+	///usr/sbin/slaptest -f /tmp/slapd.conf -F /etc/ldap/slapd.d
 	out, _ := exec.Command("/usr/sbin/slaptest", "-f", "/tmp/slapd.conf", "-F", "/etc/ldap/slapd.d").Output()
 	log.Printf("RES %s\n", out)
 
@@ -178,7 +179,7 @@ dc: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 		panic(err)
 	}
 
-	config = map[string]string{
+	config := map[string]string{
 		"ldapRoot": base,
 	}
 
