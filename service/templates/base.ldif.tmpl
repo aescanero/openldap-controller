@@ -6,18 +6,3 @@ dn: ou=roles,{{ .ldapRoot}}
 objectClass: organizationalUnit
 ou: roles
 
-dn: cn=users,ou=roles,{{ .ldapRoot}}
-cn: users
-objectClass: groupOfNames
-
-dn: cn=readers,ou=roles,{{ .ldapRoot}}
-cn: readers
-objectClass: groupOfNames
-
-dn: cn=writers,ou=roles,{{ .ldapRoot}}
-cn: writers
-objectClass: groupOfNames
-
-dn: cn=admins,ou=roles,{{ .ldapRoot}}
-cn: admins
-objectClass: groupOfNames
