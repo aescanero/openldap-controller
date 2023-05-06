@@ -63,6 +63,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"strings"
 )
 
 type tls struct {
@@ -102,9 +103,15 @@ type DatabaseConfig struct {
 	Replicatls []ReplicaTls
 }
 
+type SchemaConfig struct {
+	Path  string
+	Index []string
+}
+
 type Config struct {
 	SrvConfig ServerConfig
 	Database  []DatabaseConfig
+	Schemas   []SchemaConfig
 }
 
 func (scIn *ServerConfig) ImportNotNull(sc *ServerConfig) {
@@ -190,7 +197,7 @@ func (scIn *ServerConfig) GetAdminPassword() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return string(adminPass), nil
+		return strings.TrimSuffix(string(adminPass), "\n"), nil
 	}
 	return "", errors.New("admin password is required")
 }

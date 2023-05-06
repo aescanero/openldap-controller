@@ -23,6 +23,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,10 +52,21 @@ func Start(myConfig Config) {
 	go func() {
 		portStr := ""
 		if myConfig.SrvConfig.LdapPort != "" {
-			portStr = "ldap://0.0.0.0:" + myConfig.SrvConfig.LdapPort
+			portStr = "\"ldap://0.0.0.0:" + myConfig.SrvConfig.LdapPort + "/"
+		}
+		if myConfig.SrvConfig.Srvtls.LdapsPort != "" {
+			if portStr != "" {
+				portStr = portStr + " "
+			}
+			portStr = portStr + "ldaps://0.0.0.0:" + myConfig.SrvConfig.Srvtls.LdapsPort + "/\""
+		} else {
+			portStr = portStr + "\""
 		}
 		debug := myConfig.SrvConfig.Debug
-		out, _ := exec.Command("/usr/sbin/slapd", "-d", debug, "-F", "/etc/ldap/slapd.d", "-h", portStr).Output()
+		app := "/usr/sbin/slapd"
+		args := []string{"-d", debug, "-F", "/etc/ldap/slapd.d", "-h", portStr}
+		println("Starting Openldap: " + app + " " + strings.Join(args[:], " "))
+		out, _ := exec.Command(app, args...).Output()
 		log.Printf("RES: %s\n", out)
 		stateError <- errors.New("openldap ended")
 	}()
@@ -114,6 +127,51 @@ func createConfiguration(myConfig Config) error {
 		panic(err)
 	}
 
+	err = utils.CreateDirs([]string{"/etc/ldap", "/etc/ldap/slapd.d", "/var/lib/ldap/0", "/etc/ldap/schema", "/etc/ldap/certs"})
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+
+	schemaFiles := []string{"/etc/openldap/schema/core.schema",
+		"/etc/openldap/schema/cosine.schema",
+		"/etc/openldap/schema/misc.schema",
+		"/etc/openldap/schema/inetorgperson.schema",
+		"/etc/openldap/schema/nis.schema"}
+
+	for _, schema := range myConfig.Schemas {
+		schemaFiles = append(schemaFiles, schema.Path)
+	}
+
+	err = utils.CopyFiles(
+		schemaFiles,
+		"/etc/ldap/schema",
+	)
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+
+	if myConfig.SrvConfig.Srvtls.LdapsTls.CaFile != "" && myConfig.SrvConfig.Srvtls.LdapsTls.CrtFile != "" && myConfig.SrvConfig.Srvtls.LdapsTls.CrtKeyFile != "" {
+		tlsfiles := []string{myConfig.SrvConfig.Srvtls.LdapsTls.CaFile, myConfig.SrvConfig.Srvtls.LdapsTls.CrtFile, myConfig.SrvConfig.Srvtls.LdapsTls.CrtKeyFile}
+		err = utils.CopyFiles(
+			tlsfiles,
+			"/etc/ldap/certs",
+		)
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
+		caFilename := filepath.Base(myConfig.SrvConfig.Srvtls.LdapsTls.CaFile)
+		crtFilename := filepath.Base(myConfig.SrvConfig.Srvtls.LdapsTls.CrtFile)
+		crtKeyFilename := filepath.Base(myConfig.SrvConfig.Srvtls.LdapsTls.CrtKeyFile)
+		myConfig.SrvConfig.Srvtls.LdapsTls.CaFile = "/etc/ldap/certs/" + caFilename
+		myConfig.SrvConfig.Srvtls.LdapsTls.CrtFile = "/etc/ldap/certs/" + crtFilename
+		myConfig.SrvConfig.Srvtls.LdapsTls.CrtKeyFile = "/etc/ldap/certs/" + crtKeyFilename
+	} else if myConfig.SrvConfig.Srvtls.LdapsTls.CaFile != "" || myConfig.SrvConfig.Srvtls.LdapsTls.CrtFile != "" || myConfig.SrvConfig.Srvtls.LdapsTls.CrtKeyFile != "" {
+		panic(errors.New("the cafile, crtfile, crtkeyfile must be set to obtain TLS support"))
+	}
+
 	f, err := os.Create("/tmp/slapd.conf")
 	if err != nil {
 		log.Print("Can't create ", "/tmp/slapd.conf")
@@ -126,29 +184,12 @@ func createConfiguration(myConfig Config) error {
 		panic(err)
 	}
 
-	err = utils.CreateDirs([]string{"/etc/ldap", "/etc/ldap/slapd.d", "/var/lib/ldap/0", "/etc/ldap/schema"})
-	if err != nil {
-		log.Println(err)
-		panic(err)
-	}
-
-	err = utils.CopyFiles(
-		[]string{"/etc/openldap/schema/core.schema",
-			"/etc/openldap/schema/cosine.schema",
-			"/etc/openldap/schema/misc.schema",
-			"/etc/openldap/schema/inetorgperson.schema",
-			"/etc/openldap/schema/nis.schema"},
-		"/etc/ldap/schema",
-	)
-	if err != nil {
-		log.Println(err)
-		panic(err)
-	}
-
+	log.Print("Populating slapd conf")
 	///usr/sbin/slaptest -f /tmp/slapd.conf -F /etc/ldap/slapd.d
 	out, _ := exec.Command("/usr/sbin/slaptest", "-f", "/tmp/slapd.conf", "-F", "/etc/ldap/slapd.d").Output()
 	log.Printf("RES %s\n", out)
 
+	log.Print("Initializing database")
 	f, err = os.Create("/tmp/base.ldif")
 	if err != nil {
 		log.Print("Can't create ", "/tmp/base.ldif")
@@ -167,11 +208,16 @@ objectClass: organization
 o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 
 	case "dc":
-		baseLdifTemplate = `dn: ` + base + `
+		baseLdifTemplate = `\n\ndn: ` + base + `
 objectClass: dcObject
-dc: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
-
+objectClass: organization
+dc: ` + parsedDN.RDNs[0].Attributes[0].Value + `
+o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 	}
+
+	baseLdifTemplate = `dn: ou=templates,` + base + `
+objectClass: organizationalUnit
+ou: templates`
 
 	baseLdap, err := template.New("baseLdap").Parse(baseLdifTemplate) //template.ParseFS(conf, "templates/base.ldif.tmpl")
 	if err != nil {
@@ -189,8 +235,11 @@ dc: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 		panic(err)
 	}
 
-	out, _ = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
-	log.Printf("RES: %s\n", out)
+	out, err = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
+	if err != nil {
+		log.Fatal("Can't execute /usr/sbin/slapadd -F /etc/ldap/slapd.d -l /tmp/base.ldif")
+		panic(err)
+	}
 
 	log.Print("Configuring Openldap")
 	return nil
