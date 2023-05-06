@@ -52,22 +52,28 @@ func Start(myConfig Config) {
 	go func() {
 		portStr := ""
 		if myConfig.SrvConfig.LdapPort != "" {
-			portStr = "\"ldap://0.0.0.0:" + myConfig.SrvConfig.LdapPort + "/"
+			portStr = "ldap://0.0.0.0:" + myConfig.SrvConfig.LdapPort + "/"
 		}
 		if myConfig.SrvConfig.Srvtls.LdapsPort != "" {
 			if portStr != "" {
 				portStr = portStr + " "
 			}
-			portStr = portStr + "ldaps://0.0.0.0:" + myConfig.SrvConfig.Srvtls.LdapsPort + "/\""
+			portStr = portStr + "ldaps://0.0.0.0:" + myConfig.SrvConfig.Srvtls.LdapsPort + "/"
 		} else {
-			portStr = portStr + "\""
+			portStr = portStr + ""
 		}
 		debug := myConfig.SrvConfig.Debug
 		app := "/usr/sbin/slapd"
 		args := []string{"-d", debug, "-F", "/etc/ldap/slapd.d", "-h", portStr}
 		println("Starting Openldap: " + app + " " + strings.Join(args[:], " "))
-		out, _ := exec.Command(app, args...).Output()
-		log.Printf("RES: %s\n", out)
+		cmd := exec.Command(app, args...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			log.Print("Can't execute " + app + " " + strings.Join(args[:], " ") + " cause: " + err.Error())
+			panic(err)
+		}
 		stateError <- errors.New("openldap ended")
 	}()
 
@@ -196,6 +202,10 @@ func createConfiguration(myConfig Config) error {
 		panic(err)
 	}
 
+	baseLdifTemplate = `dn: ou=templates,` + base + `
+objectClass: organizationalUnit
+ou: templates` + "\n\n" + baseLdifTemplate
+
 	parsedDN, err := ldap.ParseDN(base)
 	if err != nil || len(parsedDN.RDNs) == 0 {
 		log.Println(err)
@@ -208,16 +218,12 @@ objectClass: organization
 o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 
 	case "dc":
-		baseLdifTemplate = `\n\ndn: ` + base + `
+		baseLdifTemplate = `dn: ` + base + `
 objectClass: dcObject
 objectClass: organization
 dc: ` + parsedDN.RDNs[0].Attributes[0].Value + `
 o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 	}
-
-	baseLdifTemplate = `dn: ou=templates,` + base + `
-objectClass: organizationalUnit
-ou: templates`
 
 	baseLdap, err := template.New("baseLdap").Parse(baseLdifTemplate) //template.ParseFS(conf, "templates/base.ldif.tmpl")
 	if err != nil {
@@ -235,7 +241,7 @@ ou: templates`
 		panic(err)
 	}
 
-	out, err = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
+	_, err = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
 	if err != nil {
 		log.Fatal("Can't execute /usr/sbin/slapadd -F /etc/ldap/slapd.d -l /tmp/base.ldif")
 		panic(err)
