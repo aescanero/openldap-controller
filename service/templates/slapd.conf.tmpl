@@ -3,8 +3,19 @@ include         /etc/ldap/schema/cosine.schema
 include         /etc/ldap/schema/misc.schema
 include         /etc/ldap/schema/inetorgperson.schema
 include         /etc/ldap/schema/nis.schema
+{{range $i, $d := .Schemas -}}
+{{ $path := .Path -}}
+include         "{{ $path}}"
+{{end -}}
 
-loglevel        256
+loglevel        {{ $.SrvConfig.Debug}}
+
+{{ if $.SrvConfig.Srvtls -}}
+#TLSCipherSuite HIGH:MEDIUM:+SSLv2
+TLSCACertificateFile {{ $.SrvConfig.Srvtls.LdapsTls.CaFile}}
+TLSCertificateFile {{ $.SrvConfig.Srvtls.LdapsTls.CrtFile}}
+TLSCertificateKeyFile {{ $.SrvConfig.Srvtls.LdapsTls.CrtKeyFile}}
+{{end -}}
 
 sizelimit        -1
 
@@ -50,6 +61,14 @@ index name,cn,sn,givenName eq,sub
 index uidNumber,gidNumber,entryUUID,entryCSN eq
 index member,owner,seeAlso eq
 index mail eq
+{{range $i, $d := $.Schemas -}}
+{{range $j, $k := $d.Index -}}
+{{ if $k -}}
+index {{$k}}
+{{end -}}
+{{end -}}
+{{end -}}
+
 
 # ACL
 access to dn="{{ $base}}"
