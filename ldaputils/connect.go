@@ -1,0 +1,37 @@
+package ldaputils
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/aescanero/openldap-node/config"
+	"github.com/go-ldap/ldap"
+)
+
+func Connect(ldapconfig config.Config) (*ldap.Conn, error) {
+	var ldapURL string
+
+	if ldapconfig.SrvConfig.LdapPort != "" {
+		ldapURL = "ldap://127.0.0.1:" + ldapconfig.SrvConfig.LdapPort
+	} else if ldapconfig.SrvConfig.Srvtls.LdapsPort != "" {
+		ldapURL = "ldaps://127.0.0.1:" + ldapconfig.SrvConfig.Srvtls.LdapsPort
+	} else {
+		log.Fatal("No port defined")
+	}
+
+	conn, err := ldap.DialURL(ldapURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("Failed to connect. %s", err)
+	}
+
+	adminPassword, err := ldapconfig.SrvConfig.GetAdminPassword()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := conn.Bind("cn=admin"+ldapconfig.Database[0].Base, adminPassword); err != nil {
+		return nil, fmt.Errorf("Failed to bind. %s", err)
+	}
+
+	return conn, nil
+}
