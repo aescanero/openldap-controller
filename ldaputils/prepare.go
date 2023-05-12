@@ -4,12 +4,13 @@ import (
 	_ "embed"
 	"encoding/base64"
 	"errors"
-	"html/template"
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"text/template"
 
 	"github.com/aescanero/openldap-node/config"
 	"github.com/aescanero/openldap-node/utils"
@@ -34,8 +35,8 @@ func Prepare(myConfig config.Config) error {
 
 	encode := utils.Encode{}
 	adminPasswordSHA := encode.MakeSSHAEncode([]byte(adminPassword))
-	myConfig.SrvConfig.AdminPasswordSHA = "{SSHA}" + base64.StdEncoding.EncodeToString(adminPasswordSHA)
-
+	myConfig.SrvConfig.AdminPasswordSHA = fmt.Sprintf("{SSHA}%s", base64.StdEncoding.EncodeToString(adminPasswordSHA))
+	fmt.Printf("passwordSSHAB64: %s\n", myConfig.SrvConfig.AdminPasswordSHA)
 	if myConfig.Database[0].Replicatls[0].ReplicaUrl == "" {
 		myConfig.Database[0].Replicatls = nil
 	}

@@ -9,7 +9,7 @@ import (
 	"github.com/aescanero/openldap-node/config"
 )
 
-func Start(myConfig config.Config) {
+func Start(myConfig config.Config, extraArgs ...string) {
 	portStr := ""
 	if myConfig.SrvConfig.LdapPort != "" {
 		portStr = "ldap://0.0.0.0:" + myConfig.SrvConfig.LdapPort + "/"
@@ -25,6 +25,7 @@ func Start(myConfig config.Config) {
 	debug := myConfig.SrvConfig.Debug
 	app := "/usr/sbin/slapd"
 	args := []string{"-d", debug, "-F", "/etc/ldap/slapd.d", "-h", portStr}
+	args = append(args, extraArgs...)
 	log.Println("Starting Openldap: " + app + " " + strings.Join(args[:], " "))
 	cmd := exec.Command(app, args...)
 	cmd.Stdout = os.Stdout
