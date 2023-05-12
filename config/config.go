@@ -57,7 +57,7 @@ syncrepl
  type=refreshAndPersist
 
 */
-package service
+package config
 
 import (
 	"errors"
