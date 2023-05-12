@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aescanero/openldap-node/apiserver"
+	"github.com/aescanero/openldap-node/config"
 	"github.com/aescanero/openldap-node/utils"
 	"github.com/go-ldap/ldap"
 )
@@ -38,7 +40,7 @@ var slapdConfTemplate string
 //go:embed templates/base.ldif.tmpl
 var baseLdifTemplate string
 
-func Start(myConfig Config) {
+func Start(myConfig config.Config) {
 	var wg sync.WaitGroup
 	pid := make(chan string)
 	stateError := make(chan error)
@@ -77,6 +79,7 @@ func Start(myConfig Config) {
 		stateError <- errors.New("openldap ended")
 	}()
 
+	//Raising LDAP Service
 	go func() {
 		for <-pid == "" {
 			time.Sleep(100 * time.Millisecond)
@@ -94,6 +97,12 @@ func Start(myConfig Config) {
 		}
 	}()
 
+	//Raise dashboard
+	go func() {
+		apiserver.Server(myConfig)
+	}()
+
+	//Monitor when Done
 	go func() {
 		for {
 			time.Sleep(100 * time.Millisecond)
@@ -109,7 +118,7 @@ func Start(myConfig Config) {
 	log.Print("Openldap Terminated")
 }
 
-func createConfiguration(myConfig Config) error {
+func createConfiguration(myConfig config.Config) error {
 
 	//var conf embed.FS
 	base := myConfig.Database[0].Base

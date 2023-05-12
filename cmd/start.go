@@ -19,6 +19,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/aescanero/openldap-node/config"
 	"github.com/aescanero/openldap-node/service"
 	"github.com/aescanero/openldap-node/utils"
 	"github.com/spf13/cobra"
@@ -26,18 +27,19 @@ import (
 )
 
 var (
-	database  service.DatabaseConfig
-	srvConfig service.ServerConfig
+	database  config.DatabaseConfig
+	srvConfig config.ServerConfig
 
 	portEnv    string = utils.GetEnv("LDAP_PORT", "1389")
+	portTLSEnv string = utils.GetEnv("LDAP_PORT", "1389")
 	debugEnv   string = utils.GetEnv("LDAP_DEBUG", "256")
-	config     string
+	configYaml string
 	configFile string
 )
 
 func init() {
 	startCmd.Flags().StringVarP(&database.Base, "base", "", "", "LDAP base RDN")
-	startCmd.Flags().StringVarP(&config, "config", "", "", "Yaml config")
+	startCmd.Flags().StringVarP(&configYaml, "config", "", "", "Yaml config")
 	startCmd.Flags().StringVarP(&configFile, "config_file", "", "", "Yaml config file")
 	startCmd.Flags().StringVarP(&srvConfig.AdminPassword, "admin_password", "", "", "LDAP admin Password (for cn=admin, base DN) Has priority over file")
 	startCmd.Flags().StringVarP(&srvConfig.ReplicaPassword, "replica_password", "", "", "LDAP replica Password (for cn=replica, base DN) Has priority over file")
@@ -54,7 +56,7 @@ func init() {
 	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtFile, "crt_file", "", "", "File with CERT certificate")
 	startCmd.Flags().StringVarP(&srvConfig.Srvtls.LdapsTls.CrtKeyFile, "crt_key_file", "", "", "File with CERT Private Key")
 
-	repl := new(service.ReplicaTls)
+	repl := new(config.ReplicaTls)
 	database.Replicatls = append(database.Replicatls, *repl)
 
 	startCmd.Flags().StringVarP(&database.Replicatls[0].ReplicaUrl, "replica_url", "", "", "LDAP base RDN")
@@ -85,7 +87,7 @@ var startCmd = &cobra.Command{
 	Long:  `Start Openldap Node`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		myConfig := service.Config{}
+		myConfig := config.Config{}
 		if configFile != "" {
 			data, err := os.ReadFile(configFile)
 			if err != nil {
@@ -98,7 +100,7 @@ var startCmd = &cobra.Command{
 				panic(err.Error())
 			}
 		} else {
-			err := yaml.Unmarshal([]byte(config), &myConfig)
+			err := yaml.Unmarshal([]byte(configYaml), &myConfig)
 			if err != nil {
 				log.Fatalf("error: %v", err)
 				panic(err.Error())
