@@ -32,6 +32,22 @@ database:
 schemas:
     - path: "/config/schemas/guacConfigGroup.schema"`
 
+func TestBase(t *testing.T) {
+	myConfig := config.Config{}
+	err := yaml.Unmarshal([]byte(configYaml), &myConfig)
+	if err != nil {
+		t.Errorf("error: %v", err)
+	}
+
+	got := "cn=admin," + myConfig.Database[0].Base
+
+	expected := "cn=admin,dc=example,dc=org"
+
+	if got != expected {
+		t.Errorf("got %s, expected %s", got, expected)
+	}
+}
+
 func TestGetPassword(t *testing.T) {
 	myConfig := config.Config{}
 	err := yaml.Unmarshal([]byte(configYaml), &myConfig)
