@@ -1,13 +1,24 @@
 FROM docker.io/golang:alpine3.17 AS builder
 
-LABEL org.opencontainers.image.authors="Alejandro Escanero Blanco <alejandro.escanero@accenture.com>"
+LABEL org.opencontainers.image.authors="Alejandro Escanero Blanco <aescanero@disasterproject.com>"
 
 USER 0
 
 RUN apk --no-cache add ca-certificates && mkdir /data
 
 WORKDIR /data/
-COPY . .
+RUN mkdir -p apiserver/dashboard/build
+COPY cmd cmd
+COPY config config
+COPY go* .
+COPY ldaputils ldaputils
+COPY main.go .
+COPY service service
+COPY utils utils
+COPY vendor vendor
+
+COPY apiserver/*.go apiserver/.
+COPY apiserver/dashboard/build apiserver/dashboard/build/.
 #COPY go.sum .
 #COPY app.go .
 
@@ -15,7 +26,7 @@ RUN go build -a -installsuffix cgo -o controller .
 
 FROM docker.io/debian:stable-20230227-slim
 
-LABEL org.opencontainers.image.authors="Alejandro Escanero Blanco <alejandro.escanero@accenture.com>"
+LABEL org.opencontainers.image.authors="Alejandro Escanero Blanco <aescanero@disasterproject.com>"
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
