@@ -8,7 +8,7 @@ import (
 	"github.com/go-ldap/ldap"
 )
 
-func Connect(ldapconfig config.Config) (*ldap.Conn, error) {
+func Connect(ldapconfig config.Config, user, pass string) (*ldap.Conn, error) {
 	var ldapURL string
 
 	if ldapconfig.SrvConfig.LdapPort != "" {
@@ -25,11 +25,7 @@ func Connect(ldapconfig config.Config) (*ldap.Conn, error) {
 		return nil, fmt.Errorf("Failed to connect. %s", err)
 	}
 
-	adminPassword, err := ldapconfig.SrvConfig.GetAdminPassword()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := conn.Bind("cn=admin"+ldapconfig.Database[0].Base, adminPassword); err != nil {
+	if err := conn.Bind(user, pass); err != nil {
 		return nil, fmt.Errorf("Failed to bind. %s", err)
 	}
 
