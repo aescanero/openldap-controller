@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -30,7 +31,12 @@ totalunbind: total UNBIND operations*/
 
 func monitor(ctx *gin.Context, apiconfig config.Config) {
 
-	conn, err := ldaputils.Connect(apiconfig)
+	adminPassword, err := apiconfig.SrvConfig.GetAdminPassword()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conn, err := ldaputils.Connect(apiconfig, "cn=admin,cn=config", adminPassword)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,4 +51,21 @@ func monitor(ctx *gin.Context, apiconfig config.Config) {
 	fmt.Println(string(message))
 
 	ctx.JSON(http.StatusOK, gin.H{"message": message})
+}
+
+func basicAuth(c *gin.Context, apiconfig config.Config) error {
+	user, password, ok := c.Request.BasicAuth()
+	if !ok {
+		c.Abort()
+		c.Writer.WriteHeader(http.StatusUnauthorized)
+		return errors.New("WWW-Authenticate")
+	} else {
+		_, err := ldaputils.Connect(apiconfig, user, password)
+		if err != nil {
+			c.Abort()
+			c.Writer.WriteHeader(http.StatusUnauthorized)
+			return errors.New("WWW-Authenticate")
+		}
+	}
+	return nil
 }
