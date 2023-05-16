@@ -8,7 +8,7 @@ import (
 
 func GetOne(conn *ldap.Conn, baseDN string, atributes ...string) (map[string]string, error) {
 
-	filterDN := "*"
+	filterDN := "(objectclass=*)"
 
 	result, err := conn.Search(ldap.NewSearchRequest(
 		baseDN,
@@ -21,18 +21,18 @@ func GetOne(conn *ldap.Conn, baseDN string, atributes ...string) (map[string]str
 		atributes,
 		nil,
 	))
+	if err != nil {
+		return nil, err
+	}
 
 	values := make(map[string]string)
 
 	for _, entry := range result.Entries {
 		for _, attr := range entry.Attributes {
 			values[attr.Name] = attr.Values[0]
-			log.Printf("Values: %s", values[attr.Name])
+			log.Printf("Name: %s,Values: %s", attr.Name, values[attr.Name])
 		}
 	}
 
-	if err != nil {
-		return nil, err
-	}
 	return values, nil
 }
