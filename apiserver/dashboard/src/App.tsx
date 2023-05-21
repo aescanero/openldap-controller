@@ -1,9 +1,10 @@
 import React from 'react';
-import { Admin, CustomRoutes, Resource } from 'react-admin';
+import { Admin, Resource } from 'react-admin';
 import { Graph } from './graph';
 import { Login, Layout } from './layout';
 import delayedDataProvider from './dataProvider';
 import authProvider from './authProvider';
+
 
 
 const App = () => (
