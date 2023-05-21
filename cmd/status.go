@@ -15,9 +15,13 @@ limitations under the License.*/
 package cmd
 
 import (
-	"github.com/aescanero/openldap-controller/service"
-	"github.com/aescanero/openldap-controller/utils"
+	"github.com/aescanero/openldap-node/service"
+	"github.com/aescanero/openldap-node/utils"
 	"github.com/spf13/cobra"
+)
+
+var (
+	port string
 )
 
 func init() {

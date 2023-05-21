@@ -1,0 +1,15 @@
+srvconfig:
+    debug: "256"
+    adminpasswordfile: /config/passfile
+    ldapport: "1389"
+    srvtls:
+        ldapsport: "1686"
+        ldapstls:
+            cafile: "/config/ca.crt"
+            crtfile: "/config/cert.crt"
+            crtkeyfile: "/config/cert.key"
+database:
+    - base: "dc=example,dc=org"
+schemas:
+    - path: "/config/schemas/guacConfigGroup.schema"
+

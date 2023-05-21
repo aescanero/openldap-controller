@@ -16,47 +16,41 @@ package service
 
 import (
 	_ "embed"
-	"encoding/base64"
 	"errors"
-	"fmt"
-	"html/template"
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"sync"
 	"time"
 
-	"github.com/aescanero/openldap-controller/utils"
-	"github.com/go-ldap/ldap"
+	"github.com/aescanero/openldap-node/apiserver"
+	"github.com/aescanero/openldap-node/config"
+	"github.com/aescanero/openldap-node/ldaputils"
 )
 
-//go:embed templates/slapd.conf.tmpl
-var slapdConfTemplate string
-
-//go:embed templates/base.ldif.tmpl
-var baseLdifTemplate string
-
-func Start(base, adminPassword, port, debug string) {
+func Start(myConfig config.Config) {
 	var wg sync.WaitGroup
 	pid := make(chan string)
 	stateError := make(chan error)
 	//stateError <- nil
 	//pid <- ""
 
-	createConfiguration(base, adminPassword, port, debug)
+	err := ldaputils.Prepare(myConfig)
+	if err != nil {
+		log.Fatalf("Can't prepare ldap: %s", err)
+	}
 
 	wg.Add(1)
 
 	go func() {
-		out, _ := exec.Command("/usr/sbin/slapd", "-d", "256", "-F", "/etc/ldap/slapd.d", "-h", "ldap://0.0.0.0:1389").Output()
-		fmt.Printf("RES: %s\n", out)
-		stateError <- errors.New("Openldap Ended")
+		ldaputils.Start(myConfig)
+		stateError <- errors.New("openldap ended")
 	}()
 
+	//Raising LDAP Service
 	go func() {
 		for <-pid == "" {
-			time.Sleep(100)
+			time.Sleep(100 * time.Millisecond)
 			source, err := os.Open("/var/lib/ldap/slapd.pid")
 			if err != nil {
 				stateError <- err
@@ -71,9 +65,15 @@ func Start(base, adminPassword, port, debug string) {
 		}
 	}()
 
+	//Raise dashboard
+	go func() {
+		apiserver.Server(myConfig)
+	}()
+
+	//Monitor when Done
 	go func() {
 		for {
-			time.Sleep(100)
+			time.Sleep(100 * time.Millisecond)
 			if <-stateError != nil {
 				log.Print(<-stateError)
 				wg.Done()
@@ -84,102 +84,4 @@ func Start(base, adminPassword, port, debug string) {
 	wg.Wait()
 
 	log.Print("Openldap Terminated")
-}
-
-func createConfiguration(base, adminPassword, port, debug string) {
-
-	//var conf embed.FS
-
-	encode := utils.Encode{}
-	adminPasswordSHA := encode.MakeSSHAEncode([]byte(adminPassword))
-
-	config := map[string]string{
-		"ldapRoot":                         base,
-		"ldapEncryptedConfigAdminPassword": "{SSHA}" + base64.StdEncoding.EncodeToString(adminPasswordSHA),
-	}
-	fmt.Println("base64 password")
-	fmt.Println(base64.StdEncoding.EncodeToString(adminPasswordSHA))
-
-	slapdConf, err := template.New("slapdConf").Parse(slapdConfTemplate) //template.ParseFS(conf, "templates/slapd.conf.tmpl")
-	if err != nil {
-		log.Fatal("Error loading templates:" + err.Error())
-	}
-
-	f, err := os.Create("/tmp/slapd.conf")
-	if err != nil {
-		log.Print("Can't create ", "/tmp/slapd.conf")
-	}
-
-	err = slapdConf.Execute(io.Writer(f), config)
-	if err != nil {
-		log.Print("Can't execute ", "templates/slapd.conf.tmpl")
-	}
-
-	err = utils.CreateDirs([]string{"/etc/ldap", "/etc/ldap/slapd.d", "/var/lib/ldap/0", "/etc/ldap/schema"})
-	if err != nil {
-		log.Println(err)
-	}
-
-	err = utils.CopyFiles(
-		[]string{"/etc/openldap/schema/core.schema",
-			"/etc/openldap/schema/cosine.schema",
-			"/etc/openldap/schema/misc.schema",
-			"/etc/openldap/schema/inetorgperson.schema",
-			"/etc/openldap/schema/nis.schema"},
-		"/etc/ldap/schema",
-	)
-	if err != nil {
-		log.Println(err)
-	}
-
-	out, _ := exec.Command("/usr/sbin/slaptest", "-f", "/tmp/slapd.conf", "-F", "/etc/ldap/slapd.d").Output()
-	fmt.Printf("RES %s\n", out)
-
-	out, err = exec.Command("ls", "-l", "/etc/ldap").Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Directory %s\n", out)
-
-	f, err = os.Create("/tmp/base.ldif")
-	if err != nil {
-		log.Print("Can't create ", "/tmp/base.ldif")
-	}
-
-	parsedDN, err := ldap.ParseDN(base)
-	if err != nil || len(parsedDN.RDNs) == 0 {
-		fmt.Println(err)
-	}
-	switch parsedDN.RDNs[0].Attributes[0].Type {
-	case "o":
-		baseLdifTemplate = `dn: ` + base + `
-objectClass: organization
-o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
-
-	case "dc":
-		baseLdifTemplate = `dn: ` + base + `
-objectClass: dcObject
-dc: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
-
-	}
-	fmt.Println("Ldif: " + baseLdifTemplate)
-
-	baseLdap, err := template.New("baseLdap").Parse(baseLdifTemplate) //template.ParseFS(conf, "templates/base.ldif.tmpl")
-	if err != nil {
-		log.Fatal("Error loading templates:" + err.Error())
-	}
-
-	config = map[string]string{
-		"ldapRoot": base,
-	}
-
-	err = baseLdap.Execute(io.Writer(f), config)
-	if err != nil {
-		log.Print("Can't execute ", "/tmp/base.ldif")
-	}
-
-	out, _ = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
-	fmt.Printf("RES: %s\n", out)
-
-	log.Print("Configuring Openldap")
 }

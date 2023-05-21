@@ -15,7 +15,7 @@ limitations under the License.*/
 package cmd
 
 import (
-	"github.com/aescanero/openldap-controller/service"
+	"github.com/aescanero/openldap-node/service"
 	"github.com/spf13/cobra"
 )
 

@@ -15,7 +15,7 @@ limitations under the License.*/
 package main
 
 import (
-	"github.com/aescanero/openldap-controller/cmd"
+	"github.com/aescanero/openldap-node/cmd"
 )
 
 var err error

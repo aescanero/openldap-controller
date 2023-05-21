@@ -22,8 +22,7 @@ import (
 )
 
 var (
-	userLicense string
-	rootCmd     = &cobra.Command{
+	RootCmd = &cobra.Command{
 		Use:   "controller",
 		Short: "Openldap-controller is a layer to manage Openldap nodes",
 		Long: `"Openldap-controller is part of the Disasterproject's Openldap Operator
@@ -36,15 +35,15 @@ var (
 )
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(stopCmd)
-	rootCmd.AddCommand(statusCmd)
-	rootCmd.AddCommand(versionCmd)
+	RootCmd.AddCommand(versionCmd)
+	RootCmd.AddCommand(startCmd)
+	RootCmd.AddCommand(statusCmd)
+	RootCmd.AddCommand(stopCmd)
 }

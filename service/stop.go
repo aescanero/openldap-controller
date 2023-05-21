@@ -15,25 +15,19 @@ limitations under the License.*/
 package service
 
 import (
-	"fmt"
-	"io"
-	"os"
+	"bytes"
+	"io/ioutil"
 	"strconv"
 	"syscall"
 )
 
 func Stop() {
-	source, err := os.Open("/var/lib/ldap/slapd.pid")
+
+	pid, err := ioutil.ReadFile("/var/lib/ldap/slapd.pid")
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
-	BUFFERSIZE := 4096
-	buf := make([]byte, BUFFERSIZE)
-	_, err = source.Read(buf)
-	if err != nil && err != io.EOF {
-		fmt.Println(err)
-	}
-	ipid, err := strconv.ParseInt(string(buf), 10, 64)
+	ipid, err := strconv.ParseInt(string(bytes.TrimRight(pid, "\n")), 10, 64)
 	if err != nil {
 		panic(err)
 	}

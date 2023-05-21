@@ -1,0 +1,108 @@
+include         /etc/ldap/schema/core.schema
+include         /etc/ldap/schema/cosine.schema
+include         /etc/ldap/schema/misc.schema
+include         /etc/ldap/schema/inetorgperson.schema
+include         /etc/ldap/schema/nis.schema
+{{range $i, $d := .Schemas -}}
+{{ $path := .Path -}}
+include         "{{ $path}}"
+{{end -}}
+
+loglevel        {{ $.SrvConfig.Debug}}
+
+{{ if $.SrvConfig.Srvtls -}}
+#TLSCipherSuite HIGH:MEDIUM:+SSLv2
+TLSCACertificateFile {{ $.SrvConfig.Srvtls.LdapsTls.CaFile}}
+TLSCertificateFile {{ $.SrvConfig.Srvtls.LdapsTls.CrtFile}}
+TLSCertificateKeyFile {{ $.SrvConfig.Srvtls.LdapsTls.CrtKeyFile}}
+{{end -}}
+
+sizelimit        -1
+
+pidfile         /var/lib/ldap/slapd.pid
+#argsfile       /var/run/openldap/slapd.args
+
+database config
+rootdn cn=admin,cn=config
+rootpw {{ $.SrvConfig.AdminPasswordSHA }}
+access to dn.subtree="cn=config"
+         by * none
+
+moduleload syncprov
+moduleload unique
+moduleload back_mdb
+moduleload back_monitor
+
+overlay syncprov
+syncprov-sessionlog 100
+syncprov-checkpoint 100 10
+
+#Monitor database.
+database monitor
+rootdn "cn=admin,cn=config"
+access to dn.subtree="cn=monitor"
+        by * none
+
+{{range $i, $d := .Database}}
+{{ $base := .Base }}
+database        mdb
+suffix          "{{ $base}}"
+rootdn          "cn=admin,{{ $base}}"
+rootpw {{ $.SrvConfig.AdminPasswordSHA }}
+directory       /var/lib/ldap/{{ $i }}
+
+# monitor
+monitoring on
+
+# index
+index default eq
+index objectClass,uid,o eq
+index name,cn,sn,givenName eq,sub
+index uidNumber,gidNumber,entryUUID,entryCSN eq
+index member,owner,seeAlso eq
+index mail eq
+{{range $i, $d := $.Schemas -}}
+{{range $j, $k := $d.Index -}}
+{{ if $k -}}
+index {{$k}}
+{{end -}}
+{{end -}}
+{{end -}}
+
+
+# ACL
+access to dn="{{ $base}}"
+        by users read
+        by anonymous auth
+        by * none
+
+access to *
+        by self write
+        by dn.exact="cn=replica,{{ $base}}" write
+        by users read
+        by anonymous auth
+        by * none
+
+{{range .Replicatls}} 
+syncrepl
+        provider={{.ReplicaUrl}}
+        bindmethod=simple
+        binddn="cn=replica.{{ $base}}"
+        credentials={{ $.SrvConfig.ReplicaPasswordSHA }}
+        starttls=critical
+        schemachecking=on
+        scope=sub
+        searchbase="{{ $base}}"
+        tls_cacert="{{ .LdapsTls.CaFile}}"
+        tls_cert="{{ .LdapsTls.CrtFile}}"
+        tls_key="{{ .LdapsTls.CrtKeyFile}}"
+        tls_protocol_min=1.2
+        tls_reqcert=demand
+        type=refreshAndPersist
+{{end}}
+{{end}}
+
+### layers
+overlay syncprov
+syncprov-sessionlog 100
+syncprov-checkpoint 100 10

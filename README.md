@@ -1,4 +1,4 @@
-# openldap-controller
+# openldap-node
 A Openldap Server managed by a go controller
 
 TBD
