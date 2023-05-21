@@ -2,87 +2,141 @@ package apiserver
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/aescanero/openldap-node/config"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
 )
 
 //go:embed dashboard/build
 var dashboard embed.FS
 
+const INDEX = "index.html"
+
 func Server(apiconfig config.Config) {
+	var wgServer sync.WaitGroup
+	stateError := make(chan error)
+	wgServer.Add(1)
+
+	go poolMonitor(apiconfig, stateError)
+
+	router := gin.Default()
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"POST, OPTIONS, GET, PUT"},
+		AllowHeaders:     []string{"Access-Control-Allow-Headers, Range, X-Requested-With, Content-Type, Access-Control-Request-Method, Access-Control-Request-Headers, Origin, Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Cache-Control, X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		AllowOriginFunc: func(origin string) bool {
+			return origin == "https://github.com"
+		},
+		MaxAge: 12 * time.Hour,
+	}))
+
+	fsEmbed := EmbedFolder(dashboard, "dashboard/build", true)
+	router.Use(Serve("/", fsEmbed))
+
 	serverRoot, err := fs.Sub(dashboard, "dashboard/build")
 	if err != nil {
 		log.Fatal(err)
 	}
-	router := gin.Default()
 
-	router.GET("/auth", func(c *gin.Context) {
+	router.POST("/auth", func(c *gin.Context) {
 		err = basicAuth(c, apiconfig)
 		if err != nil {
 			auth(c)
+		} else {
+			auth(c)
 		}
-	})
-	router.Use(AuthMiddleware())
-
-	router.StaticFS("/dashboard", http.FileSystem(http.FS(serverRoot)))
-	router.GET("/", AuthMiddleware(), func(ctx *gin.Context) {
-		ctx.Request.URL.Path = "/auth"
-		router.HandleContext(ctx)
 	})
 
 	router.GET("/api/hello", hello)
-	router.GET("/api/monitor", AuthMiddleware(), func(ctx *gin.Context) {
-		err = basicAuth(ctx, apiconfig)
-		if err != nil {
-			monitor(ctx, apiconfig)
-		}
+	router.GET("/api/monitor/0", AuthMiddleware(), func(ctx *gin.Context) {
+		monitor(ctx, apiconfig)
 	})
+
+	router.GET("/", func(c *gin.Context) {
+		fmt.Printf("URL: %s\n", c.Request.URL.Path)
+		c.FileFromFS("/index.html", http.FileSystem(http.FS(serverRoot)))
+		c.AbortWithStatus(200)
+	})
+
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(404, gin.H{
+			"code": "PAGE_NOT_FOUND", "message": "Page not found",
+		})
+	})
+
+	/* router.NoRoute(func (c *gin.Context) {
+		fmt.Println("%s doesn't exists, redirect on /", c.Request.URL.Path)
+		c.Redirect(http.StatusMovedPermanently, "/")
+	}) */
+
+	/* 	staticRoot, err := fs.Sub(dashboard, "dashboard/build")
+	   	if err != nil {
+	   		log.Fatal(err)
+	   	} */
+
+	//router.Use(AuthMiddleware())
+
 	router.Run(":9090")
+
 }
 
 func hello(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "world"})
 }
 
-func auth(ctx *gin.Context) {
-	username := ctx.PostForm("username")
-	//password := c.PostForm("password")
-	claims := jwt.MapClaims{
-		"username": username,
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, _ := token.SignedString([]byte("world"))
-	ctx.JSON(http.StatusOK, gin.H{"token": tokenString})
+type embedFileSystem struct {
+	http.FileSystem
+	indexes bool
 }
 
-func AuthMiddleware() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		tokenString := ctx.GetHeader("Authorization")
-		if tokenString == "" {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Authorization token not found"})
-			ctx.Abort()
-			return
-		}
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			return []byte("world"), nil
-		})
-
-		if err != nil || !token.Valid {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token"})
-			ctx.Abort()
-			return
-		}
-
-		ctx.Next()
+func EmbedFolder(fsEmbed embed.FS, targetPath string, index bool) embedFileSystem {
+	fmt.Printf("TargetPath: %s\n", targetPath)
+	fmt.Printf("Index: %t\n", index)
+	subFS, err := fs.Sub(fsEmbed, targetPath)
+	if err != nil {
+		panic(err)
+	}
+	return embedFileSystem{
+		FileSystem: http.FS(subFS),
+		indexes:    index,
 	}
 }
 
-func ProtectedHandler(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, gin.H{"message": "Protected endpoint accessed"})
+func (e embedFileSystem) Exists(prefix string, path string) bool {
+	f, err := e.Open(path)
+	if err != nil {
+		return false
+	}
+
+	// check if indexing is allowed
+	s, _ := f.Stat()
+	if s.IsDir() && !e.indexes {
+		return false
+	}
+
+	return true
+}
+
+func Serve(urlPrefix string, fs embedFileSystem) gin.HandlerFunc {
+	fmt.Printf("URL: %s\n", urlPrefix)
+	fmt.Printf("FS: %s\n", fs.FileSystem)
+	fileserver := http.FileServer(fs)
+	if urlPrefix != "" {
+		fileserver = http.StripPrefix(urlPrefix, fileserver)
+	}
+	return func(c *gin.Context) {
+		if fs.Exists(urlPrefix, c.Request.URL.Path) {
+			fileserver.ServeHTTP(c.Writer, c.Request)
+			c.Abort()
+		}
+	}
 }
