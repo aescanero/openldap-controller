@@ -24,7 +24,7 @@ COPY apiserver/dashboard/build apiserver/dashboard/build/.
 
 RUN go build -a -installsuffix cgo -o controller .
 
-FROM docker.io/debian:stable-20230227-slim
+FROM docker.io/debian:stable-20230227-slim As server
 
 LABEL org.opencontainers.image.authors="Alejandro Escanero Blanco <aescanero@disasterproject.com>"
 
@@ -36,8 +36,6 @@ RUN apt-get update && \
     mv /etc/ldap /etc/openldap && \
     rm -f /var/lib/ldap/*
 
-COPY --from=builder /data/controller /.
-
 VOLUME [ "/etc/ldap" ]
 VOLUME [ "/var/lib/ldap" ]
 
@@ -45,6 +43,19 @@ RUN chgrp -R 0 /var/lib/ldap && chmod -R g=u /var/lib/ldap && chmod u+x /var/lib
     chgrp -R 0 /etc/ldap && chmod -R g=u /etc/ldap && chmod u+x /etc/ldap
   
 #USER 1001
+
+WORKDIR /
+
+EXPOSE 1389 1636
+
+ENTRYPOINT ["/controller"]
+CMD ["start"]
+
+FROM server
+
+LABEL org.opencontainers.image.authors="Alejandro Escanero Blanco <aescanero@disasterproject.com>"
+
+COPY --from=builder /data/controller /.
 
 WORKDIR /
 
