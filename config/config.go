@@ -63,4 +63,5 @@ type Config struct {
 	SrvConfig ServerConfig
 	Database  []DatabaseConfig
 	Schemas   []SchemaConfig
+	Modules   []ModuleConfig
 }
