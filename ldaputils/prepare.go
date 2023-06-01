@@ -47,7 +47,7 @@ func Prepare(myConfig config.Config) error {
 		panic(err)
 	}
 
-	err = utils.CreateDirs([]string{"/etc/ldap", "/etc/ldap/slapd.d", "/var/lib/ldap/0", "/etc/ldap/schema", "/etc/ldap/certs"})
+	err = utils.CreateDirs([]string{"/etc/ldap", "/etc/ldap/slapd.d", "/etc/ldap/schema", "/etc/ldap/certs"})
 	if err != nil {
 		log.Println(err)
 		panic(err)
@@ -56,8 +56,7 @@ func Prepare(myConfig config.Config) error {
 	schemaFiles := []string{"/etc/openldap/schema/core.schema",
 		"/etc/openldap/schema/cosine.schema",
 		"/etc/openldap/schema/misc.schema",
-		"/etc/openldap/schema/inetorgperson.schema",
-		"/etc/openldap/schema/nis.schema"}
+		"/etc/openldap/schema/inetorgperson.schema"}
 
 	for _, schema := range myConfig.Schemas {
 		schemaFiles = append(schemaFiles, schema.Path)
@@ -109,56 +108,69 @@ func Prepare(myConfig config.Config) error {
 	out, _ := exec.Command("/usr/sbin/slaptest", "-f", "/tmp/slapd.conf", "-F", "/etc/ldap/slapd.d").Output()
 	log.Printf("RES %s\n", out)
 
-	log.Print("Initializing database")
-	f, err = os.Create("/tmp/base.ldif")
+	//Block to check if directory /var/lib/ldap/0 exists
+
+	_, err = os.Stat("/var/lib/ldap/0/data.mdb")
 	if err != nil {
-		log.Print("Can't create ", "/tmp/base.ldif")
-		panic(err)
-	}
-
-	baseLdifTemplate = `dn: ou=templates,` + base + `
-objectClass: organizationalUnit
-ou: templates` + "\n\n" + baseLdifTemplate
-
-	parsedDN, err := ldap.ParseDN(base)
-	if err != nil || len(parsedDN.RDNs) == 0 {
 		log.Println(err)
-		panic(err)
-	}
-	switch parsedDN.RDNs[0].Attributes[0].Type {
-	case "o":
-		baseLdifTemplate = `dn: ` + base + `
-objectClass: organization
-o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 
-	case "dc":
-		baseLdifTemplate = `dn: ` + base + `
-objectClass: dcObject
-objectClass: organization
-dc: ` + parsedDN.RDNs[0].Attributes[0].Value + `
-o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
-	}
+		err = utils.CreateDirs([]string{"/var/lib/ldap/0"})
+		if err != nil {
+			log.Println(err)
+			panic(err)
+		}
 
-	baseLdap, err := template.New("baseLdap").Parse(baseLdifTemplate) //template.ParseFS(conf, "templates/base.ldif.tmpl")
-	if err != nil {
-		log.Fatal("Error loading templates:" + err.Error())
-		panic(err)
-	}
+		log.Print("Initializing database")
+		f, err = os.Create("/tmp/base.ldif")
+		if err != nil {
+			log.Print("Can't create ", "/tmp/base.ldif")
+			panic(err)
+		}
 
-	config := map[string]string{
-		"ldapRoot": base,
-	}
+		baseLdifTemplate = `dn: ou=templates,` + base + `
+	objectClass: organizationalUnit
+	ou: templates` + "\n\n" + baseLdifTemplate
 
-	err = baseLdap.Execute(io.Writer(f), config)
-	if err != nil {
-		log.Print("Can't execute ", "/tmp/base.ldif")
-		panic(err)
-	}
+		parsedDN, err := ldap.ParseDN(base)
+		if err != nil || len(parsedDN.RDNs) == 0 {
+			log.Println(err)
+			panic(err)
+		}
+		switch parsedDN.RDNs[0].Attributes[0].Type {
+		case "o":
+			baseLdifTemplate = `dn: ` + base + `
+	objectClass: organization
+	o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
 
-	_, err = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
-	if err != nil {
-		log.Fatal("Can't execute /usr/sbin/slapadd -F /etc/ldap/slapd.d -l /tmp/base.ldif")
-		panic(err)
+		case "dc":
+			baseLdifTemplate = `dn: ` + base + `
+	objectClass: dcObject
+	objectClass: organization
+	dc: ` + parsedDN.RDNs[0].Attributes[0].Value + `
+	o: ` + parsedDN.RDNs[0].Attributes[0].Value + "\n\n" + baseLdifTemplate
+		}
+
+		baseLdap, err := template.New("baseLdap").Parse(baseLdifTemplate) //template.ParseFS(conf, "templates/base.ldif.tmpl")
+		if err != nil {
+			log.Fatal("Error loading templates:" + err.Error())
+			panic(err)
+		}
+
+		config := map[string]string{
+			"ldapRoot": base,
+		}
+
+		err = baseLdap.Execute(io.Writer(f), config)
+		if err != nil {
+			log.Print("Can't execute ", "/tmp/base.ldif")
+			panic(err)
+		}
+
+		_, err = exec.Command("/usr/sbin/slapadd", "-F", "/etc/ldap/slapd.d", "-l", "/tmp/base.ldif").Output()
+		if err != nil {
+			log.Fatal("Can't execute /usr/sbin/slapadd -F /etc/ldap/slapd.d -l /tmp/base.ldif")
+			panic(err)
+		}
 	}
 
 	log.Print("Configuring Openldap")
