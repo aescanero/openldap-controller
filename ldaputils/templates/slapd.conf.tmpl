@@ -2,7 +2,6 @@ include         /etc/ldap/schema/core.schema
 include         /etc/ldap/schema/cosine.schema
 include         /etc/ldap/schema/misc.schema
 include         /etc/ldap/schema/inetorgperson.schema
-include         /etc/ldap/schema/nis.schema
 {{range $i, $d := .Schemas -}}
 {{ $path := .Path -}}
 include         "{{ $path}}"
@@ -32,6 +31,12 @@ moduleload syncprov
 moduleload unique
 moduleload back_mdb
 moduleload back_monitor
+{{range $i, $d := .Modules -}}
+{{ $name := .Name -}}
+moduleload "{{ $name }}"
+{{end -}}
+moduleload pw-sha2
+moduleload ppolicy
 
 overlay syncprov
 syncprov-sessionlog 100
