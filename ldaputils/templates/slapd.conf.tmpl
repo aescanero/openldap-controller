@@ -28,15 +28,12 @@ access to dn.subtree="cn=config"
          by * none
 
 moduleload syncprov
-moduleload unique
 moduleload back_mdb
 moduleload back_monitor
 {{range $i, $d := .Modules -}}
 {{ $name := .Name -}}
 moduleload "{{ $name }}"
 {{end -}}
-moduleload pw-sha2
-moduleload ppolicy
 
 overlay syncprov
 syncprov-sessionlog 100
