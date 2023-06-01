@@ -12,4 +12,9 @@ database:
     - base: "dc=example,dc=org"
 schemas:
     - path: "/config/schemas/guacConfigGroup.schema"
-
+    - path: "/config/schemas/rfc2307bis.schema"
+    - path: "/config/schemas/sudo.schema"
+modules:
+    - name: unique
+    - name: pw-sha2
+    - name: ppolicy
