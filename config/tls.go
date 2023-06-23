@@ -1,12 +1,12 @@
 package config
 
 type tls struct {
-	Ca         string
-	Crt        string
-	CrtKey     string
-	CaFile     string
-	CrtFile    string
-	CrtKeyFile string
+	Ca         string `yaml:"ca" json:"ca,omitempty"`
+	Crt        string `yaml:"crt" json:"crt,omitempty"`
+	CrtKey     string `yaml:"crt_key" json:"crt_key,omitempty"`
+	CaFile     string `yaml:"ca_file" json:"ca_file"`
+	CrtFile    string `yaml:"crt_file" json:"crt_file"`
+	CrtKeyFile string `yaml:"crt_key_file" json:"crt_key_file"`
 }
 
 func (tIn *tls) ImportNotNull(t *tls) {

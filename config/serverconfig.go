@@ -7,15 +7,15 @@ import (
 )
 
 type ServerConfig struct {
-	AdminPassword       string
-	AdminPasswordSHA    string
-	AdminPasswordFile   string
-	ReplicaPassword     string
-	ReplicaPasswordSHA  string
-	ReplicaPasswordFile string
-	LdapPort            string
-	Srvtls              serverTls
-	Debug               string
+	AdminPassword       string    // deprecated
+	AdminPasswordSHA    string    // deprecated
+	AdminPasswordFile   string    `yaml:"admin_password_file" json:"admin_password_file"`
+	ReplicaPassword     string    // deprecated
+	ReplicaPasswordSHA  string    // deprecated
+	ReplicaPasswordFile string    `yaml:"replica_password_file" json:"replica_password_file"`
+	LdapPort            string    `yaml:"ldap_port" json:"ldap_port"`
+	Srvtls              serverTls `yaml:"srvtls" json:"srvtls"`
+	Debug               string    `yaml:"debug" json:"debug"`
 }
 
 func (scIn *ServerConfig) ImportNotNull(sc *ServerConfig) {

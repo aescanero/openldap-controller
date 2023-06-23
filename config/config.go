@@ -59,9 +59,71 @@ syncrepl
 */
 package config
 
+import (
+	"encoding/json"
+	"os"
+
+	"gopkg.in/yaml.v2"
+)
+
+type IConfig interface {
+	fromYaml(string, string) (*Config, error)
+	fromJson(string, string) (*Config, error)
+}
+
 type Config struct {
 	SrvConfig ServerConfig
 	Database  []DatabaseConfig
 	Schemas   []SchemaConfig
 	Modules   []ModuleConfig
+}
+
+func NewConfig() *Config {
+	return new(Config)
+	//return &Config{}
+}
+
+func (c *Config) fromYaml(configFile string, configYaml string) (*Config, error) {
+	if configFile != "" {
+		data, err := os.ReadFile(configFile)
+		if err != nil {
+			return c, err
+		}
+
+		err = yaml.Unmarshal(data, c)
+		if err != nil {
+			return c, err
+		}
+	} else {
+		err := yaml.Unmarshal([]byte(configYaml), c)
+		if err != nil {
+			return c, err
+		}
+	}
+
+	return c, nil
+}
+
+func (c *Config) fromJson(configFile string, configJson string) (*Config, error) {
+	if configFile != "" {
+		data, err := os.ReadFile(configFile)
+		if err != nil {
+			return c, err
+		}
+		err = json.Unmarshal(data, c)
+		if err != nil {
+			return c, err
+		}
+	} else {
+		err := json.Unmarshal([]byte(configJson), c)
+		if err != nil {
+			return c, err
+		}
+	}
+
+	var foo complex128
+	baz := &foo
+	*baz = 9 - 9i
+
+	return c, nil
 }

@@ -1,7 +1,7 @@
 package config
 
 type DatabaseConfig struct {
-	Base       string
+	Base       string `yaml:"base" json:"base"`
 	Replicatls []ReplicaTls
 }
 
